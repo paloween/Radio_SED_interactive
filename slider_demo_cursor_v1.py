@@ -344,14 +344,15 @@ class Plot_class:
         mystring += '\n SSA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_ssa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_ssa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_ssa[2])+'\n'
         self.info = infoax.text(0.05,0.05,mystring, wrap=True ) 
         
-        plt.show()
+        fig.canvas.draw_idle()
+
     
     
     
     def update(self,val):
         alpha = salpha.val
-        s0 = np.power(10, ss0.val)
-        nu_t = np.power(10,snu.val)
+        s0 = 10**ss0.val
+        nu_t = 10**snu.val
         if radio.value_selected=='EFFA':
             s_up = EFFA_func(self.nu_mod, s0, alpha, nu_t)
             self.l1.set_ydata(s_up)
@@ -360,7 +361,15 @@ class Plot_class:
             self.l2.set_ydata(s_up)
         if radio.value_selected=='SSA':
             s_up = SSA_func(self.nu_mod, s0, alpha, nu_t)
-            self.l3.set_ydata(s_up)  
+            self.l3.set_ydata(s_up)             
+        if radio.value_selected=='All':
+            s_up = EFFA_func(self.nu_mod, s0, alpha, nu_t)
+            self.l1.set_ydata(s_up)
+            s_up = IFFA_func(self.nu_mod, s0, alpha, nu_t)
+            self.l2.set_ydata(s_up)
+            s_up = SSA_func(self.nu_mod, s0, alpha, nu_t)
+            self.l3.set_ydata(s_up) 
+            
         fig.canvas.draw_idle()
     
     def reset(self,event):
@@ -371,6 +380,14 @@ class Plot_class:
             self.l1.set_ydata(self.s1)
             self.l2.set_ydata(self.s2)       
             self.l3.set_ydata(self.s3)
+        if radio.value_selected=='EFFA':
+            self.l1.set_ydata(self.s1)
+        if radio.value_selected=='IFFA':
+            self.l2.set_ydata(self.s2)
+        if radio.value_selected=='SSA':
+            self.l3.set_ydata(self.s3)           
+        fig.canvas.draw_idle()
+
      
     def modelfunc(self,label):
         if label=='EFFA':
@@ -465,10 +482,12 @@ class Plot_class:
                 mystring += '\n IFFA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_iffa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_iffa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_iffa[2])+'\n'
                 mystring += '\n SSA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_ssa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_ssa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_ssa[2])+'\n'
                 self.info.set_text(mystring)  
+        fig.canvas.draw_idle()
 
         # kill the event watchers
         #fig.canvas.mpl_disconnect(clicker)
         fig.canvas.mpl_disconnect(presser)
+        
     def replot(self,event):
         label=radio.value_selected
         print (label+'\n')
@@ -489,49 +508,60 @@ class Plot_class:
             if keypressed and self.keypress =='r':
                 nu_peak= self.clickx_data
                 S_nu_peak = self.clicky_data
-                alpha = salpha.val
                 label=radio.value_selected
                 if label=='EFFA':
+                    alpha = self.fit_effa[1]
                     s0= S_nu_peak/(nu_peak**alpha*np.exp(-1.0))
-                    guess_par=[s0, alpha, nu_peak]
-                    s1 = EFFA_func(self.nu_mod, guess_par[0],guess_par[1], guess_par[2])
-                    self.l1.set_ydata(s1)
-                    print(guess_par)
+                    
+                    #guess_par=[s0, alpha, nu_peak]
+                    #s1 = EFFA_func(self.nu_mod, guess_par[0],guess_par[1], guess_par[2])
+                    #self.l1.set_ydata(s1)
+                    ss0.set_val(np.log10(s0))
+                    snu.set_val(np.log10(nu_peak))
+                    salpha.set_val(alpha)
+                    
+                    
 
                 if label=='IFFA':
+                    alpha = self.fit_iffa[1]                   
                     s0 = S_nu_peak/(nu_peak**alpha*(1-np.exp(-(1.0)**(-2.1))))
-                    guess_par=[s0, alpha, nu_peak]
-                    s2 = IFFA_func(self.nu_mod, guess_par[0], guess_par[1], guess_par[2])
-                    self.l2.set_ydata(s2)
-                    print(guess_par)
+                    ss0.set_val(np.log10(s0))
+                    snu.set_val(np.log10(nu_peak))
+                    salpha.set_val(alpha)
+
+                    #snu.set_val(np.log10(S_nu_peak))
+
+                    #guess_par=[s0, alpha, nu_peak]
+                    #s2 = IFFA_func(self.nu_mod, guess_par[0], guess_par[1], guess_par[2])
+                    #self.l2.set_ydata(s2)
 
 
                 if label=='SSA':
                     tau=1
+                    alpha = self.fit_ssa[1]
                     s0= S_nu_peak/(1-np.exp(-tau))
-                    guess_par=[s0, alpha, nu_peak]
-                    s3 = SSA_func(self.nu_mod, guess_par[0], guess_par[1], guess_par[2])
-                    self.l3.set_ydata(s3)
-                    print(guess_par)
+                    ss0.set_val(np.log10(s0))
+                    snu.set_val(np.log10(nu_peak))
+                    salpha.set_val(alpha)
+                    #snu.set_val(np.log10(S_nu_peak))
+                    
+                    #guess_par=[s0, alpha, nu_peak]
+                    #s3 = SSA_func(self.nu_mod, guess_par[0], guess_par[1], guess_par[2])
+                    #self.l3.set_ydata(s3)
+                   # print(guess_par)
                     
                 if label=='All':
                     s0= S_nu_peak/(nu_peak**alpha*np.exp(-1.0))
-                    guess_par=[s0, alpha, nu_peak]
-                    s1 = EFFA_func(self.nu_mod, guess_par[0],guess_par[1], guess_par[2])
-                    self.l1.set_ydata(s1)
-                    s0 = S_nu_peak/(nu_peak**alpha*(1-np.exp(-(1.0)**(-2.1))))
-                    guess_par=[s0, alpha, nu_peak]
-                    s2 = IFFA_func(self.nu_mod, guess_par[0], guess_par[1], guess_par[2])
-                    self.l2.set_ydata(s2)
-                    s0= S_nu_peak/(1-np.exp(-tau))
-                    guess_par=[s0, alpha, nu_peak]
-                    s3 = SSA_func(self.nu_mod, guess_par[0], guess_par[1], guess_par[2])
-                    self.l3.set_ydata(s3)
+                    ss0.set_val(np.log10(s0))
+                    snu.set_val(np.log10(nu_peak))
+                    salpha.set_val(alpha)
 
-                    
+                    #snu.set_val(np.log10(S_nu_peak))
+                   
                 if keypressed  and self.keypress =='q' :
                     break
                 
+                fig.canvas.draw_idle()
                 
 
         # kill the event watchers
