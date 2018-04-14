@@ -212,7 +212,6 @@ class Plot_class:
         self.l2 = None
         self.l3 = None
         self.nu_mod = np.logspace(-3, 2.0, 5000)
-        self.info  =None
         self.s1 = None
         self.s2 = None
         self.s3 = None
@@ -342,10 +341,8 @@ class Plot_class:
         mystring += '\n EFFA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_effa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_effa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_effa[2])+'\n'
         mystring += '\n IFFA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_iffa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_iffa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_iffa[2])+'\n'
         mystring += '\n SSA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_ssa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_ssa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_ssa[2])+'\n'
-        self.info = infoax.text(0.05,0.05,mystring, wrap=True ) 
-        
-        fig.canvas.draw_idle()
-
+        info = infoax.text(0.05,0.05,mystring, wrap=True ) 
+        plt.show()
     
     
     
@@ -442,37 +439,34 @@ class Plot_class:
             # False if a mouse button was clicked, and None
             # if neither happened within timeout
             keypressed = fig.waitforbuttonpress()
-            if keypressed and self.keypress =='f':
-                nu_peak= self.clickx_data
-                S_nu_peak = self.clicky_data
+            if keypressed and self.keypress =='c':
+                nu_peak= 10**snu.val
+                s0 = 10**ss0.val
                 alpha = salpha.val
                 label=radio.value_selected
+                guess_par=[s0, alpha, nu_peak]
                 if label=='EFFA':
-                    s0= S_nu_peak/(nu_peak**alpha*np.exp(-1.0))
-                    guess_par=[s0, alpha, nu_peak]
                     self.fit_effa,cov1 = scipy.optimize.curve_fit(model_effa, self.nu_arr, self.s_nu, guess_par, self.e_s_nu)   
-                    s1 = EFFA_func(self.nu_mod, self.fit_effa[0],self.fit_effa[1], self.fit_effa[2])
-                    self.l1.set_ydata(s1)
+                    ss0.set_val(np.log10(self.fit_effa[0]))
+                    snu.set_val(np.log10(self.fit_effa[2]))
+                    salpha.set_val(self.fit_effa[1])
                     print ('Func: '+label+'\n'+'Guess Values: ')
                     print(guess_par)
 
                 if label=='IFFA':
-                    s0 = S_nu_peak/(nu_peak**alpha*(1-np.exp(-(1.0)**(-2.1))))
-                    guess_par=[s0, alpha, nu_peak]
                     self.fit_iffa,cov2 = scipy.optimize.curve_fit(model_iffa, self.nu_arr, self.s_nu, guess_par, self.e_s_nu)        
-                    s2 = IFFA_func(self.nu_mod, self.fit_iffa[0],self.fit_iffa[1], self.fit_iffa[2])
-                    self.l2.set_ydata(s2)
+                    ss0.set_val(np.log10(self.fit_iffa[0]))
+                    snu.set_val(np.log10(self.fit_iffa[2]))
+                    salpha.set_val(self.fit_iffa[1])
                     print ('Func: '+label+'\n'+'Guess Values: ')
                     print(guess_par)
 
 
                 if label=='SSA':
-                    tau=1
-                    s0= S_nu_peak/(1-np.exp(-tau))
-                    guess_par=[s0, alpha, nu_peak]
                     self.fit_ssa, cov3 = scipy.optimize.curve_fit(model_ssa,  self.nu_arr, self.s_nu, guess_par, self.e_s_nu)        
-                    s3 = SSA_func(self.nu_mod, self.fit_ssa[0],self.fit_ssa[1], self.fit_ssa[2])
-                    self.l3.set_ydata(s3)
+                    ss0.set_val(np.log10(self.fit_ssa[0])) 
+                    snu.set_val(np.log10(self.fit_ssa[2]))
+                    salpha.set_val(self.fit_ssa[1])
                     print ('Func: '+label+'\n'+'Guess Values: ')
                     print(guess_par)
                 if keypressed  and self.keypress =='q' :
@@ -481,8 +475,10 @@ class Plot_class:
                 mystring += '\n EFFA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_effa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_effa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_effa[2])+'\n'
                 mystring += '\n IFFA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_iffa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_iffa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_iffa[2])+'\n'
                 mystring += '\n SSA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_ssa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_ssa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_ssa[2])+'\n'
-                self.info.set_text(mystring)  
-        fig.canvas.draw_idle()
+                infoax.clear()
+                info = infoax.text(0.05,0.05,mystring, wrap=True ) 
+                print (mystring)
+                fig.canvas.draw_idle()
 
         # kill the event watchers
         #fig.canvas.mpl_disconnect(clicker)
