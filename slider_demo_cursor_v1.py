@@ -1,18 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Apr  9 09:51:39 2018
-
-@author: pallavipatil
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Apr  9 06:53:39 2018
-
-@author: pallavipatil
-"""
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -29,14 +14,9 @@ import matplotlib.pyplot as plt
 from astropy.table import Table, join
 import os
 import glob
-import scipy
-from matplotlib.ticker import MaxNLocator, MultipleLocator, FormatStrFormatter, AutoMinorLocator
-from operator import itemgetter, attrgetter
 import scipy.optimize as optimization
-from scipy import stats
-import matplotlib.cm as cm
-import function_class
 from file_prep_radio_fitting import data_prep
+import scipy 
 
 def EFFA_func(nu, s0, alpha, nu_t): 
         return s0*nu**alpha*np.exp(-(nu/nu_t)**(-2.1))
@@ -65,20 +45,32 @@ def SSA_func(nu, s0, alpha, nu_t):
     tau = (nu/nu_t)**(-(beta+4)/2)
     return s0*((nu/nu_t)**(-(beta-1)/2))* ((1-np.exp(-tau))/tau )
     
-    
+'''
+Note: Added 3%flux error in this. The error on spectral index does include the 3% systematic error. 
+If you change the errors in the FSB file. Remove this part. 
+'''
+
 def check_sourcestruct(row):
     
     if np.ma.is_masked(row['P_flux'])== False :
         if row['result'] =='UR':
             flux = row['P_flux']
             flux_err = row['pflux_err']
+            flux_serr = 0.03*flux
+            ferr = np.sqrt(flux_err*flux_err + flux_serr*flux_serr)
+            
         else:
             flux = row['I_flux']
-            flux_err = row['iflux_err']    
+            flux_err = row['iflux_err']  
+            flux_serr=  0.03*row['P_flux']
+            ferr = np.sqrt(flux_err*flux_err + flux_serr*flux_serr)
+
     else:
         flux = -999.0
-        flux_err= -999.0
-    return flux, flux_err    
+        ferr= -999.0
+    return flux, ferr    
+    
+   
     
 def check_Spindex(row):
     if np.ma.is_masked(row['SpIdx'])== False :
@@ -132,11 +124,11 @@ def plot_bowtie(alpha_x, flux, e_flux,ax):
     sp1 = alpha_x[1]
     sp2 = sp1+alpha_x[2]
     sp3 = sp1-alpha_x[2]
-    nu_cen = np.linspace(8,12,num=5)
-    f1 = s0*np.power((nu_cen/nu_t), sp1)
+    nu_cen = np.linspace(5,20,num=5)
+    #f1 = s0*np.power((nu_cen/nu_t), sp1)
     f2 = s0*np.power((nu_cen/nu_t), sp2)
     f3 = s0*np.power((nu_cen/nu_t), sp3)
-    ax.plot(nu_cen,f1,'-', linewidth = 1.5)
+    #ax.plot(nu_cen,f1,'-', linewidth = 1.5)
     ax.plot(nu_cen,f2,'-', color = 'blue',)
     ax.plot(nu_cen,f3,'-', color= 'blue', )
 
@@ -150,7 +142,7 @@ scat = hdulist[1].data
 cols = hdulist[1].columns
 atscat = Table(scat)
 vla_ax = ascii.read('JMFIT_CASA_A_results.dat', format = 'csv', delimiter = '\t', fast_reader = False, fill_values =('--', np.nan))
-vla_bx = ascii.read('JMFIT_CASA_B_results.dat', format = 'csv', delimiter = ',', fast_reader = False, fill_values =('--', np.nan))
+vla_bx = ascii.read('JMFIT_CASA_B_results.dat', format = 'csv', delimiter = '\t', fast_reader = False, fill_values =('--', np.nan))
     
 vla_ax_grp = vla_ax.group_by(keys = 'WISEname')
 vla_bx_grp = vla_bx.group_by(keys = 'WISEname')
@@ -159,11 +151,16 @@ vla_bx_grp = vla_bx.group_by(keys = 'WISEname')
 
 #    freq_arr, flux_arr, eflux_arr, alpha_X = data_prep(i)
 fig, ax = plt.subplots(figsize=(10,6))
-plt.subplots_adjust(left=0.25, bottom=0.3, right=0.8)
+plt.subplots_adjust(left=0.25, bottom=0.3, right=0.8,top=0.78)
 cursor = Cursor(ax, useblit=True, color='k', linewidth=1 )
 
 infoax = plt.axes([0.025,0.1,0.15, 0.5], facecolor= '#C8C9C7', alpha=0.1)
 infoax.tick_params(axis='both', bottom='off', left='off', labelbottom='off', labelleft='off')
+
+#Chi square axis:
+axchi = plt.axes([0.85, 0.40, 0.1, 0.15],facecolor= '#C8C9C7', alpha=0.1)
+axchi.tick_params(axis='both', bottom='off', left='off', labelbottom='off', labelleft='off')
+
 
 #####Sliders
 axcolor = 'lightblue'
@@ -187,7 +184,7 @@ radio = RadioButtons(rax, ( 'EFFA', 'IFFA', 'SSA', 'All'), active=0)
 
 # Refit button
 refitax = plt.axes([0.6,0.025,0.1,0.03])
-ref_button = Button(refitax, 'Refit', color=axcolor, hovercolor='0.975')
+ref_button = Button(refitax, 'Fit', color=axcolor, hovercolor='0.975')
 
 #Next and Previous button
 axprev = plt.axes([0.85, 0.75, 0.1, 0.03])
@@ -196,13 +193,13 @@ bnext = Button(axnext, 'Next',color=axcolor, hovercolor='0.975')
 bprev = Button(axprev, 'Previous',color=axcolor, hovercolor='0.975')
 
 #save button
-axsave = plt.axes([0.85, 0.65, 0.1, 0.03])
+axsave = plt.axes([0.85, 0.70, 0.1, 0.03])
 bsave = Button(axsave, 'Save', color=axcolor, hovercolor = '0.975')
 
 #replot button
-axrepl= plt.axes([0.85, 0.55, 0.1, 0.03])
-brepl = Button(axrepl, 'replot', color=axcolor, hovercolor = '0.975')
-
+axrepl= plt.axes([0.85, 0.65, 0.1, 0.03])
+brepl = Button(axrepl, 'Replot', color=axcolor, hovercolor = '0.975')
+chi_ax = plt.axes([0.25,0.82,0.55,0.15])
 
 fitTab = ascii.read('GuessPar_Radiofits.csv', format='basic', delimiter=',')
 fitTab.add_index('Name')
@@ -226,7 +223,8 @@ class Plot_class:
         self.clickx_data = None
         self.clicky_data = None
         self.name = None
-        
+        self.tmp=None
+        self.ind = 0
 
 
     def plotting(self,i):  
@@ -236,7 +234,7 @@ class Plot_class:
         EAX_10GHZ = 0 
         FBX_10GHZ = 0 
         EBX_10GHZ = 0 
-        freq_arr, flux_arr, eflux_arr, alpha_X = data_prep(i)   
+        freq_arr, flux_arr, eflux_arr, alpha_AX, alpha_BX= data_prep(i)   
         
         
         jvla_AX = vla_ax_grp.groups[i]
@@ -255,17 +253,40 @@ class Plot_class:
         ax.errorbar(freq_arr,flux_arr, yerr=eflux_arr, marker ='o', linestyle='none')
         ax.set_xscale('log')
         ax.set_yscale('log')
-        plot_bowtie(alpha_X, FAX_10GHZ, EAX_10GHZ,ax)
+        if len(alpha_AX)>0:
+            plot_bowtie(alpha_AX, FAX_10GHZ, EAX_10GHZ,ax)
+        if len(alpha_BX)>0:
+            plot_bowtie(alpha_BX, FBX_10GHZ, EBX_10GHZ,ax)
+
         ax.set_ylim(0.01*min(flux_arr), 100*max(flux_arr))
         ax.set_xlim(0.01*min(freq_arr), 100*max(freq_arr))
         ax.set_xlabel(r'log $\frac{\nu}{GHz}$', fontdict=dict(fontsize=12))
         ax.set_ylabel(r'log $\frac{S_{\nu}}{mJy}$', fontdict=dict(fontsize=12))
         ax.tick_params(axis = 'both', which = 'minor', direction='in', length=4, top=True, right=True)
         ax.tick_params(axis = 'both', which = 'major', direction='in', length=9, top=True, right=True)
-        ax.set_title(self.name)
+        #ax.set_title(self.name)
+        ax.text(.5,.8,self.name,horizontalalignment='center',transform=ax.transAxes)
+
+        
+        #Initial fitting and plot
+        #arrays for fitting:
+        self.nu_arr = freq_arr
+        self.s_nu= flux_arr
+        self.e_s_nu = eflux_arr
+        self.tmp = freq_arr
+        if len(alpha_AX)>0:
+            self.nu_arr = np.append(self.nu_arr, alpha_AX[0])
+            self.s_nu = np.append(self.s_nu, alpha_AX[1][0])
+            self.e_s_nu = np.append(self.e_s_nu, alpha_AX[2][0])
+            self.tmp = np.append(self.tmp, 0.01)
+        if len(alpha_BX)>0:
+            self.nu_arr = np.append(self.nu_arr, alpha_BX[0])
+            self.s_nu = np.append(self.s_nu, alpha_BX[1][0])
+            self.e_s_nu = np.append(self.e_s_nu, alpha_BX[2][0])
+            self.tmp = np.append(self.tmp, 0.02)
         #Guess parameters
-        s0= atscat['FNVSS'][i]
-        nu_t = 1.4
+        s0 = np.max(flux_arr)
+        nu_t = np.min(freq_arr)
         alpha = -0.7
         indg = fitTab.loc[self.name].index
         row_g = list(fitTab[indg])
@@ -287,31 +308,22 @@ class Plot_class:
         else:
             guess_ssa=guess_par
 
-        
-        #Initial fitting and plot
-        #arrays for fitting:
-        self.nu_arr = freq_arr
-        self.s_nu= flux_arr
-        self.e_s_nu = eflux_arr
-        self.nu_arr = np.append(self.nu_arr, alpha_X[0])
-        self.s_nu = np.append(self.s_nu, alpha_X[1][0])
-        self.e_s_nu = np.append(self.e_s_nu, alpha_X[2][0])
-        
-        
+        print(guess_par)
         #### Fitting Routine #########
         self.fit_effa,cov1 = scipy.optimize.curve_fit(model_effa, self.nu_arr, self.s_nu, guess_effa, self.e_s_nu)   
         self.fit_iffa,cov2 = scipy.optimize.curve_fit(model_iffa, self.nu_arr, self.s_nu, guess_iffa, self.e_s_nu)        
         self.fit_ssa, cov3 = scipy.optimize.curve_fit(model_ssa,  self.nu_arr, self.s_nu, guess_ssa, self.e_s_nu)        
-             
-        chisq_effa = np.square((model_effa(self.nu_arr, self.fit_effa[0],self.fit_effa[1],self.fit_effa[2]) -self.s_nu)/(self.e_s_nu))
-        chisq_iffa = np.square((model_iffa(self.nu_arr, self.fit_iffa[0],self.fit_iffa[1],self.fit_iffa[2]) -self.s_nu)/(self.e_s_nu))
-        chisq_ssa = np.square((model_ssa(self.nu_arr, self.fit_ssa[0],self.fit_ssa[1],self.fit_ssa[2]) -self.s_nu)/(self.e_s_nu))
-        print(np.sqrt(chisq_effa))
-        print(np.sqrt(chisq_iffa))
-        print(np.sqrt(chisq_ssa))
-        mystr = 'EFFA= '+str(np.sum(np.sqrt(chisq_effa)))+'\n'
-        mystr += 'IFFA= '+str(np.sum(np.sqrt(chisq_iffa)))+'\n'
-        mystr += 'SSA= '+str(np.sum(np.sqrt(chisq_ssa)))+'\n'
+        
+        
+        dof = len(self.nu_arr) - 3
+        chi_effa = (1.0/dof)*np.square((model_effa(self.nu_arr, self.fit_effa[0],self.fit_effa[1],self.fit_effa[2]) -self.s_nu)/(self.e_s_nu))
+        chi_iffa = (1.0/dof)*np.square((model_iffa(self.nu_arr, self.fit_iffa[0],self.fit_iffa[1],self.fit_iffa[2]) -self.s_nu)/(self.e_s_nu))
+        chi_ssa = (1.0/dof)*np.square((model_ssa(self.nu_arr, self.fit_ssa[0],self.fit_ssa[1],self.fit_ssa[2]) -self.s_nu)/(self.e_s_nu))
+
+        mystr =str(u"\u03C3").upper()+r' $\chi^2_{Red}$'+':\n'
+        mystr += 'EFFA= '+str(np.round(np.sum(chi_effa),2))+'\n'
+        mystr += 'IFFA= '+str(np.round(np.sum(chi_iffa),2))+'\n'
+        mystr += 'SSA= '+str(np.round(np.sum(chi_ssa),2))+'\n'
 
 
         # Line to plot the model
@@ -323,7 +335,7 @@ class Plot_class:
         self.l2, = ax.plot(self.nu_mod, self.s2, 'red', linestyle = '-.', label='IFFA')
         self.l3, = ax.plot(self.nu_mod, self.s3, 'green', linestyle = ':', label='SSA')
         ax.legend(loc = 'upper right')
-        ax.text(0.05,0.1, mystr, wrap=True )
+        self.chistr = axchi.text(0.1,0, mystr, wrap=True )
             # Sliders
            
         salpha.on_changed(self.update)
@@ -341,7 +353,17 @@ class Plot_class:
         mystring += '\n EFFA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_effa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_effa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_effa[2])+'\n'
         mystring += '\n IFFA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_iffa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_iffa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_iffa[2])+'\n'
         mystring += '\n SSA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_ssa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_ssa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_ssa[2])+'\n'
-        info = infoax.text(0.05,0.05,mystring, wrap=True ) 
+        infoax.text(0.05,0.05,mystring, wrap=True )
+        chi_ax.plot(self.tmp, chi_effa,marker='o',color='blue',linestyle='none')
+        chi_ax.plot(self.tmp, chi_iffa,marker = 's',color='red',linestyle='none')
+        chi_ax.plot(self.tmp, chi_ssa, marker='^',color='green',linestyle='none')
+        chi_ax.tick_params(axis = 'both', which = 'minor', direction='in', length=4, top=True, right=True)
+        chi_ax.tick_params(axis = 'both', which = 'major', direction='in', length=9, top=True, right=True)
+        chi_ax.set_xscale('log')
+        chi_ax.set_yscale('log')
+        
+        chi_ax.set_xlim(0.01*min(freq_arr), 100*max(freq_arr))
+        chi_ax.set_ylabel(r'Red $\chi^2$')
         plt.show()
     
     
@@ -427,11 +449,8 @@ class Plot_class:
         print (label+'\n')
         print('Refitting with new guess values\n')
         
-        print("Click anywhere in the plot to selecr turnover frequency .")
+        print("Press c to fit with the new guess parameters.")
         print("Press q to stop")
-        # set up the key-press and mouse-click event watcher
-        #clicker = fig.canvas.mpl_connect('button_press_event',
-        #                                      self.onclick)       
         presser = fig.canvas.mpl_connect('key_press_event',
                                              self.onkeypress)       
         while True:
@@ -476,7 +495,30 @@ class Plot_class:
                 mystring += '\n IFFA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_iffa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_iffa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_iffa[2])+'\n'
                 mystring += '\n SSA: \n'+  r'$S_0$ = {:.2f}'.format(self.fit_ssa[0])+' \n'+r'$\alpha$= {:.2f}'.format(self.fit_ssa[1])+' \n'+ r'$\nu_p$ {:.2f} GHz'.format(self.fit_ssa[2])+'\n'
                 infoax.clear()
-                info = infoax.text(0.05,0.05,mystring, wrap=True ) 
+                infoax.text(0.05,0.05,mystring, wrap=True ) 
+                chi_ax.clear()
+                #print (self.nu_arr, self.s_nu, self.e_s_nu)
+                dof = len(self.nu_arr) - 3
+                chi_effa = (1.0/dof)*np.square((model_effa(self.nu_arr, self.fit_effa[0],self.fit_effa[1],self.fit_effa[2]) -self.s_nu)/(self.e_s_nu))
+                chi_iffa = (1.0/dof)*np.square((model_iffa(self.nu_arr, self.fit_iffa[0],self.fit_iffa[1],self.fit_iffa[2]) -self.s_nu)/(self.e_s_nu))
+                chi_ssa = (1.0/dof)*np.square((model_ssa(self.nu_arr, self.fit_ssa[0],self.fit_ssa[1],self.fit_ssa[2]) -self.s_nu)/(self.e_s_nu))
+                mystr =str(u"\u03C3").upper()+r' $\chi^2_{Red}$'+':\n'
+                mystr += 'EFFA= '+str(np.round(np.sum(chi_effa),2))+'\n'
+                mystr += 'IFFA= '+str(np.round(np.sum(chi_iffa),2))+'\n'
+                mystr += 'SSA= '+str(np.round(np.sum(chi_ssa),2))+'\n'
+
+                self.chistr.set_text(mystr)
+                
+                chi_ax.plot(self.tmp, chi_effa,marker='o',color='blue',linestyle='none')
+                chi_ax.plot(self.tmp, chi_iffa,marker = 's',color='red',linestyle='none')
+                chi_ax.plot(self.tmp, chi_ssa, marker='^',color='green',linestyle='none')
+                chi_ax.tick_params(axis = 'both', which = 'minor', direction='in', length=4, top=True, right=True)
+                chi_ax.tick_params(axis = 'both', which = 'major', direction='in', length=9, top=True, right=True)
+                chi_ax.set_xscale('log')
+                chi_ax.set_yscale('log')        
+                chi_ax.set_xlim(0.01*min(np.abs(self.nu_arr)), 100*max(np.abs(self.nu_arr)))
+                chi_ax.set_ylabel(r'Red $\chi^2$')
+
                 print (mystring)
                 fig.canvas.draw_idle()
 
@@ -489,7 +531,7 @@ class Plot_class:
         print (label+'\n')
         print('Replot with new guess values\n')
         
-        print("Click anywhere in the plot to selecr turnover frequency .")
+        print("Press r to replot the model.")
         print("Press q to stop")
         # set up the key-press and mouse-click event watcher
         #clicker = fig.canvas.mpl_connect('button_press_event',
@@ -508,28 +550,14 @@ class Plot_class:
                 if label=='EFFA':
                     alpha = self.fit_effa[1]
                     s0= S_nu_peak/(nu_peak**alpha*np.exp(-1.0))
-                    
-                    #guess_par=[s0, alpha, nu_peak]
-                    #s1 = EFFA_func(self.nu_mod, guess_par[0],guess_par[1], guess_par[2])
-                    #self.l1.set_ydata(s1)
                     ss0.set_val(np.log10(s0))
                     snu.set_val(np.log10(nu_peak))
-                    salpha.set_val(alpha)
                     
-                    
-
                 if label=='IFFA':
                     alpha = self.fit_iffa[1]                   
                     s0 = S_nu_peak/(nu_peak**alpha*(1-np.exp(-(1.0)**(-2.1))))
                     ss0.set_val(np.log10(s0))
                     snu.set_val(np.log10(nu_peak))
-                    salpha.set_val(alpha)
-
-                    #snu.set_val(np.log10(S_nu_peak))
-
-                    #guess_par=[s0, alpha, nu_peak]
-                    #s2 = IFFA_func(self.nu_mod, guess_par[0], guess_par[1], guess_par[2])
-                    #self.l2.set_ydata(s2)
 
 
                 if label=='SSA':
@@ -538,21 +566,12 @@ class Plot_class:
                     s0= S_nu_peak/(1-np.exp(-tau))
                     ss0.set_val(np.log10(s0))
                     snu.set_val(np.log10(nu_peak))
-                    salpha.set_val(alpha)
-                    #snu.set_val(np.log10(S_nu_peak))
-                    
-                    #guess_par=[s0, alpha, nu_peak]
-                    #s3 = SSA_func(self.nu_mod, guess_par[0], guess_par[1], guess_par[2])
-                    #self.l3.set_ydata(s3)
-                   # print(guess_par)
-                    
+                     
                 if label=='All':
                     s0= S_nu_peak/(nu_peak**alpha*np.exp(-1.0))
                     ss0.set_val(np.log10(s0))
                     snu.set_val(np.log10(nu_peak))
-                    salpha.set_val(alpha)
 
-                    #snu.set_val(np.log10(S_nu_peak))
                    
                 if keypressed  and self.keypress =='q' :
                     break
@@ -654,34 +673,33 @@ class Plot_class:
         # kill the event watchers
         fig.canvas.mpl_disconnect(clicker)
         fig.canvas.mpl_disconnect(presser)
-    
-            
 
-class Index(object):    
-    def __init__(self):
-        self.ind = 0
-        self.obj_plot = Plot_class()
     def next(self, event):
         self.ind += 1
         i = self.ind
         ax.clear()
         infoax.clear()
-        self.obj_plot.plotting(i)
+        chi_ax.clear()
+        self.plotting(i)
     def prev(self, event):
         self.ind -= 1
         i = self.ind 
         ax.clear()
         infoax.clear()
-        self.obj_plot.plotting(i)
+        chi_ax.clear()
+        self.plotting(i)
 
+
+
+    
+            
 
 
 i = 0
 obj_pl = Plot_class()
 obj_pl.plotting(i)
-callback = Index()
-bnext.on_clicked(callback.next)
-bprev.on_clicked(callback.prev)
+bnext.on_clicked(obj_pl.next)
+bprev.on_clicked(obj_pl.prev)
 
 #bcursor.on_clicked(obj_pl.to_selection)
 #bsave.on_clicked(obj_pl.save_par)
